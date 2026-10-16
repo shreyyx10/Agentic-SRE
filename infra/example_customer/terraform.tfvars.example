@@ -1,0 +1,13 @@
+# Copy to $ASRE_HOME/example_customer.tfvars (your settings folder, OUTSIDE the repository)
+# and fill in (see the README's Deploy section).
+project_id             = "<customer-project-id>"
+region                 = "<region>"
+customer_id            = "example-shop"
+alert_topic_id         = "<infra/platform output tenant_topics[customer_id]>"
+reader_service_account = "<infra/platform output tenant_reader_service_accounts[customer_id]>"
+# Optional overrides (defaults in variables.tf):
+# cluster_name                      = "shop"
+# k8s_namespace                     = "default"
+# environment                       = "prod"
+# frontend_5xx_per_minute_threshold = 2
+# checkout_latency_threshold_ms     = 1500

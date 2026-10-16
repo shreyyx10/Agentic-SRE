@@ -1,0 +1,13 @@
+# Copy to $ASRE_HOME/bootstrap.tfvars (your settings folder, OUTSIDE the repository)
+# and fill in (see the README's Deploy section).
+project_id        = "<platform-project-id>"
+region            = "<region>" # ADR-0001: australia-southeast1
+state_bucket_name = "<platform-project-id>-tfstate"
+github_repository = "<owner>/<repo>"
+# Optional overrides (defaults shown):
+# deploy_branch       = "main"
+# name_prefix         = "asre"
+# image_repository_id = "agentic-sre"
+# wif_pool_id         = "github"
+# wif_provider_id     = "github-oidc"
+# labels              = { app = "agentic-sre", environment = "hackathon", managed-by = "terraform" }

@@ -1,0 +1,29 @@
+# Copy to $ASRE_HOME/platform.tfvars (your settings folder, OUTSIDE the repository)
+# and fill in (see the README's Deploy section).
+project_id               = "<platform-project-id>"
+region                   = "<region>" # ADR-0001: australia-southeast1
+deployer_service_account = "<infra/bootstrap output deployer_service_account>"
+billing_account          = "" # e.g. "012345-6789AB-CDEF01" to enable the spend alert
+
+customers = {
+  "example-shop" = {
+    gcp_project_id     = "<customer-project-id>"
+    gcp_project_number = "<customer-project-number>"
+    # flip to true after infra/example_customer has created the notification channel
+    monitoring_channel_ready = false
+  }
+}
+
+# Everything else has a documented default in variables.tf and can be overridden
+# here, for example:
+# name_prefix     = "asre"
+# labels          = { app = "agentic-sre", environment = "hackathon", managed-by = "terraform" }
+# ingest_service  = { max_instances = 20 }
+# analyse_service = { memory = "2Gi" }
+# dedup           = { window_minutes = 30 }
+# models          = { hypothesis = "gemini-3.8-flash" }  # all-Flash (ADR-0002 option B)
+# pubsub          = { max_delivery_attempts = 5 }
+# tasks_queue     = { max_dispatches_per_second = 2 }
+# secrets         = { "chat-webhook-url" = "Google Chat webhook for Brief delivery" }
+# monthly_budget  = 300
+# budget_currency = "AUD"

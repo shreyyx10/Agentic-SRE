@@ -1,0 +1,58 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+dist/
+build/
+.DS_Store
+.idea/
+.vscode/
+
+# ---------------------------------------------------------------------------
+# Environment-specific values live OUTSIDE this repository, in the settings
+# folder $ASRE_HOME (asre.env, *.tfvars, bootstrap state; see the README's Deploy section). The patterns
+# below are a second line of defence in case a copy lands here by mistake.
+# ---------------------------------------------------------------------------
+
+# Terraform / OpenTofu
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Environment files
+.env
+.env.*
+*.env
+!.env.example
+.envrc
+
+# Credentials — none should ever exist: CI uses Workload Identity Federation,
+# services use their own identities, secret values live in Secret Manager.
+*.pem
+*.key
+*.p12
+*.pfx
+*-key.json
+*credentials*.json
+application_default_credentials.json
+service-account*.json
+.gcloud/
+kubeconfig*

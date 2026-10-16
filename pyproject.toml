@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-sre"
+version = "0.1.0"
+description = "Agentic SRE: an AI on-call agent that turns a Cloud Monitoring alert into a cited Incident Brief in Google Chat."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "flask>=3.1,<4",
+  "gunicorn>=23",
+  "pydantic>=2.7,<3",
+  "google-cloud-firestore>=2.19,<3",
+  "google-cloud-tasks>=2.16,<3",
+  "google-auth>=2.30,<3",
+  "requests>=2.32,<3",
+  # Gemini on Vertex AI (ADR-0002). 2.19+ is the floor ADK 2.9 needs.
+  "google-genai>=2.25,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.6"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+asre = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+  "integration: needs the Firestore emulator (FIRESTORE_EMULATOR_HOST); skipped otherwise",
+  "legacy: proves a regression test detects the defect it guards, by running it against the pre-hackathon logic",
+]
+
+[tool.coverage.run]
+source = ["asre"]
+branch = true
+# Process wiring (env -> clients); exercised by the deployed smoke test, not unit tests.
+omit = ["*/asre/ingest/main.py", "*/asre/analyse/main.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+ignore = ["S101"]  # assert is fine in tests
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B"]

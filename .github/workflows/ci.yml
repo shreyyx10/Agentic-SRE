@@ -1,0 +1,155 @@
+name: CI
+
+# Pull requests (from any branch) run the checks once; pushes run them only on
+# the default branch, so a PR branch is not tested twice. Deployment happens
+# only from the default branch (and the deploy identity trusts only that branch).
+on:
+  pull_request:
+  push:
+    branches: [main] # workflow triggers cannot read variables; keep in step with bootstrap deploy_branch
+
+permissions:
+  contents: read
+
+# Toolchain pins, in one place. The runner image is pinned too (ubuntu-latest
+# moves to Ubuntu 26 on 19 Oct 2026, mid-judging); override with the CI_RUNNER variable. Everything environment-specific comes from
+# repository VARIABLES (Settings -> Secrets and variables -> Actions -> Variables);
+# this workflow uses no repository secrets at all.
+env:
+  PYTHON_VERSION: "3.12"
+  JAVA_VERSION: "21"
+  TERRAFORM_VERSION: "~1.9"
+  FIRESTORE_EMULATOR_HOST: 127.0.0.1:8081
+
+jobs:
+  test:
+    name: Lint + tests (coverage gate 80%, Firestore emulator)
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-24.04' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install
+        run: pip install -r requirements.lock -e ".[dev]"
+
+      - name: Lint
+        run: |
+          ruff check src tests scripts
+          ruff format --check src tests scripts
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: cloud-firestore-emulator,beta
+
+      - name: Start Firestore emulator
+        run: |
+          gcloud emulators firestore start --host-port="$FIRESTORE_EMULATOR_HOST" > /tmp/emulator.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf "http://$FIRESTORE_EMULATOR_HOST" >/dev/null && exit 0; sleep 1; done
+          cat /tmp/emulator.log; exit 1
+
+      - name: Tests (unit + legacy proofs + emulator integration)
+        run: pytest --cov --cov-report=term-missing --cov-fail-under=80
+
+  terraform:
+    name: Terraform fmt + validate
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-24.04' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+      - name: Validate every stack
+        run: |
+          for d in infra/bootstrap infra/platform infra/example_customer; do
+            echo "::group::$d"
+            (cd "$d" && terraform fmt -check && terraform init -backend=false -input=false && terraform validate) || exit 1
+            echo "::endgroup::"
+          done
+
+  iac-scan:
+    name: checkov (IaC security)
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-24.04' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra
+          framework: terraform
+          quiet: true
+          # Waivers are inline (# checkov:skip=... with a reason) next to the resource.
+
+  secrets-scan:
+    name: gitleaks
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-24.04' }}
+    # On pull requests gitleaks-action lists the PR's commits through the API,
+    # which needs pull-requests: read (the workflow default grants contents only).
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    name: Build, push and deploy by digest
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      vars.GCP_PROJECT_ID != ''
+    needs: [test, terraform, iac-scan, secrets-scan]
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-24.04' }}
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation; no JSON keys anywhere
+    env:
+      PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      IMAGE: ${{ vars.GCP_IMAGE_REPOSITORY }}/${{ vars.IMAGE_NAME || 'agentic-sre' }}
+      SERVICES: ${{ vars.GCP_RUN_SERVICES }} # infra/platform output run_services (analyse first)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and push (tag = commit SHA; tags are immutable)
+        run: |
+          : "${SERVICES:?set the GCP_RUN_SERVICES repository variable}"
+          gcloud auth configure-docker "${IMAGE%%/*}" --quiet
+          docker build \
+            --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            -t "${IMAGE}:${{ github.sha }}" .
+          docker push "${IMAGE}:${{ github.sha }}"
+
+      - name: Resolve digest
+        id: digest
+        run: |
+          DIGEST=$(gcloud artifacts docker images describe "${IMAGE}:${{ github.sha }}" --format='value(image_summary.digest)')
+          echo "ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      # Revisions only. IAM, Firestore, Pub/Sub and queue changes are applied by a
+      # human with `terraform apply` (the deployer identity cannot make them).
+      - name: Deploy the services in GCP_RUN_SERVICES (ANALYSE first)
+        run: |
+          for svc in $SERVICES; do
+            gcloud run deploy "$svc" --image="${{ steps.digest.outputs.ref }}" \
+              --region="$REGION" --project="$PROJECT" --quiet
+          done

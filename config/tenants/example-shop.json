@@ -1,0 +1,49 @@
+{
+  "display_name": "Example Shop (fictional: Google's Online Boutique sample on GKE)",
+  "environment": "prod",
+  "k8s_cluster": "shop",
+  "k8s_namespace": "default",
+  "predictive_exclude": [
+    "loadgenerator"
+  ],
+  "default_team": "platform",
+  "routing_rules": [
+    {
+      "id": "payments",
+      "pattern": "service:payment*",
+      "team": "payments-team"
+    },
+    {
+      "id": "latency",
+      "pattern": "type:high_latency",
+      "team": "checkout-team"
+    }
+  ],
+  "services": {
+    "frontend": {
+      "journey": "browse",
+      "revenue_critical": true,
+      "owner_team": "web-team"
+    },
+    "cartservice": {
+      "journey": "cart",
+      "revenue_critical": true,
+      "owner_team": "checkout-team"
+    },
+    "checkoutservice": {
+      "journey": "checkout",
+      "revenue_critical": true,
+      "owner_team": "checkout-team"
+    },
+    "paymentservice": {
+      "journey": "payment",
+      "revenue_critical": true,
+      "owner_team": "payments-team"
+    },
+    "productcatalogservice": {
+      "journey": "browse",
+      "revenue_critical": true,
+      "owner_team": "catalog-team"
+    }
+  }
+}

@@ -1,0 +1,51 @@
+# One grouped PR per ecosystem per week, minor and patch updates only.
+# Major upgrades (e.g. action v4 -> v7) can carry
+# breaking changes, so they are taken deliberately after the hackathon finale,
+# not merged by default mid-build.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: terraform
+    directories: ["/infra/bootstrap", "/infra/platform", "/infra/example_customer"]
+    schedule:
+      interval: weekly
+    groups:
+      terraform:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # Dependabot rewrites Terraform version constraints (it moved "~> 6.40" to
+      # "~> 8.4" despite the rule above), so the provider's next major is also
+      # blocked explicitly. Move this line on deliberately, after testing.
+      - dependency-name: "hashicorp/google"
+        versions: [">= 9.0.0"]
+
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
