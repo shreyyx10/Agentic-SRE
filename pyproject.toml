@@ -17,7 +17,7 @@ dependencies = [
   "google-auth>=2.30,<3",
   "requests>=2.32,<3",
   # Gemini on Vertex AI (ADR-0002). 2.19+ is the floor ADK 2.9 needs.
-  "google-genai>=2.25,<3",
+  "google-genai>=2.25,<4",
 ]
 
 [project.optional-dependencies]
